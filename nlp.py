@@ -118,7 +118,7 @@ if __name__ == '__main__':
     if args.actions[0] == 'train':
         model = Net().to(device)
         dataset = CustomDataset('data_libri_en', 2607, 2200, 64)
-        n_epochs = 1
+        n_epochs = 15
         learning_rate = 0.001
 
         train(model, device, dataset, n_epochs, learning_rate)
@@ -144,9 +144,28 @@ if __name__ == '__main__':
 
         output = x
 
+        # decoder = CTCBeamDecoder(
+        #     labels=[str(i) for i in range(61)],
+        #     model_path=None,
+        #     alpha=0,
+        #     beta=0,
+        #     cutoff_top_n=40,
+        #     cutoff_prob=1.0,
+        #     beam_width=100,
+        #     num_processes=4,
+        #     blank_id=0,
+        #     log_probs_input=True,
+        # )
+        # beam_results, beam_scores, timesteps, out_lens = decoder.decode(output)
+
+        # print(beam_results.shape)
+        # # print(beam_scores.shape)
+        # best_beam = beam_results[:, 0, :out_lens[0][0]]
+        # print(best_beam.shape)
+        # beam_results[0][0][:out_len[0][0]]
 
         decoder = CTCBeamDecoder(
-            labels=[str(i) for i in range(61)],
+            [str(i) for i in range(61)],
             model_path=None,
             alpha=0,
             beta=0,
@@ -155,11 +174,51 @@ if __name__ == '__main__':
             beam_width=100,
             num_processes=4,
             blank_id=0,
-            log_probs_input=True,
+            log_probs_input=True
         )
-        beam_results, beam_scores, timesteps, out_lens = decoder.decode(output)
 
-        print(beam_results.shape)
+        model.eval()
+        with torch.no_grad():
+            X, input_lengths, targets, target_lengths = dataset.get_next_eval_batch()
+            X, input_lengths, targets, target_lengths = X.to(device), input_lengths.to(device), targets.to(device), target_lengths.to(device)
+            X = model(X)
+            x = X[0, :input_lengths[0], :]
+            print(x.shape)
+            beam_results, beam_scores, timesteps, out_lens = decoder.decode(X[:1, :input_lengths[0], :])
+            best_beam = beam_results[0][0][:out_lens[0][0]]
+            print(best_beam)
+            # print(best_beam.shape)
+            # print(targets[:target_lengths[0]].shape)
+
+            # print(x.shape)
+
+            phones = torch.argmax(x, dim=1)
+            # print(phones.shape)
+            print(phones)
+
+    elif args.actions[0] == 'examinate':
+        model = Net().to(device)
+
+        state_dict = torch.load(f'trained/{args.actions[1]}')
+        model.load_state_dict(state_dict)
+
+        dataset = CustomDataset('data_libri_en', 2607, 2200, 64)
+
+        model.eval()
+        with torch.no_grad():
+            X, input_lengths, targets, target_lengths = dataset.get_next_eval_batch()
+            X, input_lengths, targets, target_lengths = X.to(device), input_lengths.to(device), targets.to(device), target_lengths.to(device)
+            X = model(X)
+            x = X[0, :input_lengths[0], :]
+            # print(x.shape)
+
+            phones = torch.argmax(x, dim=1)
+            # print(phones.shape)
+            print(phones)
+            print(phones[phones != 0])
+
+
+
 
     else:
         raise NotImplementedError(f'unkown script "{args.actions[0]}"')
