@@ -1,7 +1,12 @@
+import os
+import argparse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
+
+from ctcdecode import CTCBeamDecoder
+
 
 class CustomDataset:
     def __init__(self, dataset_path, len_dataset, train_size, batch_size):
@@ -97,12 +102,64 @@ def train(model, device, dataset, n_epochs, learning_rate):
         print("Average eval loss:", sum(mean_loss_eval)/len(mean_loss_eval))
         print("")
 
+    os.makedirs('trained/', exist_ok=True)
+    torch.save(model.state_dict(), f'trained/{model.__class__.__name__}-nepochs_{n_epochs}.pt')
 
-use_cuda = torch.cuda.is_available()
-device = torch.device("cuda" if use_cuda else "cpu")
-model = Net().to(device)
-dataset = CustomDataset('data_libri_en', 2607, 2200, 64)
-n_epochs = 10
-learning_rate = 0.001
 
-train(model, device, dataset, n_epochs, learning_rate)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='NLP')
+    parser.add_argument('actions', nargs='+', type=str, help='Script to run.')
+    # parser.add_argument('action', nargs='?', type=str, help='Action to run.')
+    args = parser.parse_args()
+
+    use_cuda = torch.cuda.is_available()
+    device = torch.device("cuda" if use_cuda else "cpu")
+
+    if args.actions[0] == 'train':
+        model = Net().to(device)
+        dataset = CustomDataset('data_libri_en', 2607, 2200, 64)
+        n_epochs = 1
+        learning_rate = 0.001
+
+        train(model, device, dataset, n_epochs, learning_rate)
+
+    elif args.actions[0] == 'evaluate':
+        model = Net().to(device)
+
+        state_dict = torch.load(f'trained/{args.actions[1]}')
+        model.load_state_dict(state_dict)
+
+        dataset = CustomDataset('data_libri_en', 2607, 2200, 64)
+
+        X, input_lengths, targets, target_lengths = dataset.get_next_train_batch()
+        X, input_lengths, targets, target_lengths = X.to(device), input_lengths.to(device), targets.to(device), target_lengths.to(device)
+        X = model(X)#.permute(1, 0, 2)
+
+        print(X.shape)
+
+        x = X[0, :, :]
+        x = x[None, :, :]
+
+        print(x.shape)
+
+        output = x
+
+
+        decoder = CTCBeamDecoder(
+            labels=[str(i) for i in range(61)],
+            model_path=None,
+            alpha=0,
+            beta=0,
+            cutoff_top_n=40,
+            cutoff_prob=1.0,
+            beam_width=100,
+            num_processes=4,
+            blank_id=0,
+            log_probs_input=True,
+        )
+        beam_results, beam_scores, timesteps, out_lens = decoder.decode(output)
+
+        print(beam_results.shape)
+
+    else:
+        raise NotImplementedError(f'unkown script "{args.actions[0]}"')
