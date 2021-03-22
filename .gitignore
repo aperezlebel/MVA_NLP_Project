@@ -1,5 +1,6 @@
 # Custom
 VectorQuantizedCPC
+data_libri_en
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

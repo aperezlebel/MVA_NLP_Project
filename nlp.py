@@ -53,9 +53,9 @@ class CustomDataset:
                 list_tens_audio[i] = torch.cat((list_tens_audio[i], torch.zeros((1,max_len-length,768))), dim=1)
         X = torch.cat(list_tens_audio, dim=0)
         return X, input_lengths, targets, target_lengths
-    
-    
-    
+
+
+
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
@@ -67,9 +67,9 @@ class Net(nn.Module):
         fc = self.fc(x_drop)
         output = F.log_softmax(fc, dim=2)
         return output
-    
-    
-    
+
+
+
 def train(model, device, dataset, n_epochs, learning_rate):
     ctc_loss = nn.CTCLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -96,13 +96,12 @@ def train(model, device, dataset, n_epochs, learning_rate):
                 mean_loss_eval.append(loss.item())
         print("Average eval loss:", sum(mean_loss_eval)/len(mean_loss_eval))
         print("")
-        
-        
-        
+
+
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 model = Net().to(device)
-dataset = CustomDataset('/Users/hugolaurencon/Desktop/data_libri_en', 2607, 2200, 64)
+dataset = CustomDataset('data_libri_en', 2607, 2200, 64)
 n_epochs = 10
 learning_rate = 0.001
 
